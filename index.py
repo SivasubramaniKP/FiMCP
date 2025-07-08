@@ -1,3 +1,15 @@
+"""
+Personal Finance AI Agent using Google Gemini and LangChain
+Created for Fi Money MCP Hackathon
+
+Required installations:
+pip install langchain langchain-google-genai pandas requests python-dotenv
+
+Set your Google API key:
+export GOOGLE_API_KEY="your-gemini-api-key"
+or create a .env file with GOOGLE_API_KEY=your-api-key
+"""
+
 import os
 import json
 import pandas as pd
@@ -9,14 +21,22 @@ import requests
 from io import StringIO
 import math
 
+# Set up environment
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # LangChain imports
 from langchain.tools import tool
-from langchain.agents import initialize_agent, AgentType
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 # Mock data structures
 @dataclass
@@ -465,7 +485,7 @@ def initialize_gemini_model():
     
     try:
         model = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash",
+            model="gemini-2.0-flash-exp",
             temperature=0.1,
             max_tokens=4096,
             timeout=30,
@@ -494,7 +514,7 @@ def create_financial_agent():
         generate_financial_report
     ]
     
-    # Create system prompt
+    # Create system prompt template
     system_prompt = f"""
     You are a highly intelligent personal finance AI assistant powered by Google's Gemini model. 
     You help users with comprehensive financial planning, investment analysis, and goal-based financial decisions.
@@ -516,26 +536,47 @@ def create_financial_agent():
     Always provide personalized, actionable advice based on the user's actual financial data.
     Be conversational, empathetic, and encouraging while maintaining professional accuracy.
     Use Indian currency (₹) and financial context throughout your responses.
+    
+    You have access to the following tools to analyze the user's financial data:
+    - get_net_worth_summary: Get comprehensive net worth analysis
+    - calculate_loan_affordability: Check if user can afford specific loan amounts
+    - get_sip_performance_analysis: Analyze SIP performance vs benchmarks
+    - calculate_financial_health_score: Get overall financial health score
+    - simulate_retirement_planning: Plan for retirement goals
+    - get_monthly_spending_analysis: Analyze spending patterns
+    - generate_financial_report: Create comprehensive financial reports
+    
+    Use these tools whenever the user asks questions related to their finances.
     """
     
-    # Initialize agent
-    agent = initialize_agent(
-        tools,
-        model,
-        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    # Create prompt template
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        MessagesPlaceholder(variable_name="chat_history"),
+        ("human", "{input}"),
+        MessagesPlaceholder(variable_name="agent_scratchpad")
+    ])
+    
+    # Create agent
+    agent = create_tool_calling_agent(model, tools, prompt)
+    
+    # Create agent executor
+    agent_executor = AgentExecutor(
+        agent=agent,
+        tools=tools,
         verbose=True,
         handle_parsing_errors=True,
         max_iterations=3,
         early_stopping_method="generate"
     )
     
-    return agent
+    return agent_executor
 
 # Chat interface
 class FinancialChatbot:
     def __init__(self):
         self.agent = create_financial_agent()
-        self.chat_history = ChatMessageHistory()
+        self.chat_history = []
         
     def chat(self, user_input: str) -> str:
         """Process user input and return AI response."""
@@ -543,23 +584,22 @@ class FinancialChatbot:
             return "Sorry, I'm having trouble connecting to the AI model. Please make sure your Google API key is set."
         
         try:
-            # Add user message to history
-            self.chat_history.add_user_message(user_input)
-            
-            # Get AI response
+            # Prepare input for agent
             response = self.agent.invoke({
                 "input": user_input,
-                "chat_history": self.chat_history.messages
+                "chat_history": self.chat_history
             })
             
-            # Add AI response to history
-            self.chat_history.add_ai_message(response["output"])
+            # Add to chat history
+            self.chat_history.extend([
+                HumanMessage(content=user_input),
+                AIMessage(content=response["output"])
+            ])
             
             return response["output"]
             
         except Exception as e:
             error_msg = f"I encountered an error: {str(e)}. Please try rephrasing your question."
-            self.chat_history.add_ai_message(error_msg)
             return error_msg
 
 # Main chatbot interface
