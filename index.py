@@ -22,6 +22,9 @@ from io import StringIO
 import math
 import matplotlib.pyplot as plt
 import os.path
+import asyncio
+from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.session import ClientSession
 
 # Set up environment
 try:
@@ -120,215 +123,87 @@ class RecurringDeposit:
     maturity_date: str
     bank: str
 
-# Mock Financial Data Generator
-class MockFinancialDataGenerator:
-    def __init__(self):
-        self.user_profile = {
-            "name": "Arjun Sharma",
-            "age": 28,
-            "monthly_income": 125000,
-            "city": "Bangalore",
-            "profession": "Software Engineer",
-            "risk_tolerance": "moderate"
-        }
-        
-    def generate_assets(self) -> List[Asset]:
-        return [
-            Asset("Savings Account - SBI", "cash", 350000, "2020-01-15", 100000),
-            Asset("Fixed Deposit - HDFC", "fixed_deposit", 500000, "2023-03-10", 500000),
-            Asset("Equity Portfolio", "stocks", 850000, "2021-06-01", 600000),
-            Asset("Mutual Fund Portfolio", "mutual_funds", 1200000, "2020-08-15", 800000),
-            Asset("PPF Account", "retirement", 180000, "2019-04-01", 120000),
-            Asset("Gold ETF", "commodities", 75000, "2022-01-20", 65000),
-            Asset("Apartment - Koramangala", "real_estate", 4500000, "2023-01-15", 4200000),
-        ]
-    
-    def generate_liabilities(self) -> List[Liability]:
-        return [
-            Liability("Home Loan - HDFC", "home_loan", 3200000, 8.5, 35000, 240),
-            Liability("Car Loan - ICICI", "vehicle_loan", 450000, 9.2, 18000, 36),
-            Liability("Credit Card - SBI", "credit_card", 25000, 18.0, 5000, 12),
-            Liability("Personal Loan", "personal_loan", 150000, 12.5, 8000, 24),
-        ]
-    
-    def generate_sip_investments(self) -> List[SIPInvestment]:
-        return [
-            SIPInvestment("SBI Blue Chip Fund", 10000, 280000, "2021-01-15", 12.8, "Large Cap"),
-            SIPInvestment("HDFC Mid-Cap Opportunities", 8000, 185000, "2021-06-01", 15.2, "Mid Cap"),
-            SIPInvestment("Axis Small Cap Fund", 5000, 95000, "2022-01-01", 8.5, "Small Cap"),
-            SIPInvestment("UTI Nifty Index Fund", 7000, 145000, "2020-08-15", 11.8, "Index Fund"),
-            SIPInvestment("ICICI Prudential Balanced", 6000, 125000, "2021-03-10", 10.5, "Hybrid"),
-        ]
-    
-    def generate_transactions(self) -> List[Transaction]:
-        transactions = []
-        base_date = datetime.now() - timedelta(days=90)
-        
-        # Generate income transactions
-        for i in range(3):
-            date = base_date + timedelta(days=i*30)
-            transactions.append(Transaction(
-                date.strftime("%Y-%m-%d"),
-                125000,
-                "salary",
-                "Monthly Salary",
-                "income"
-            ))
-        
-        # Generate expense transactions
-        expense_categories = [
-            ("groceries", 8000, 12000),
-            ("utilities", 3000, 5000),
-            ("entertainment", 5000, 10000),
-            ("dining", 4000, 8000),
-            ("transport", 2000, 4000),
-            ("shopping", 6000, 15000),
-            ("healthcare", 2000, 8000),
-        ]
-        
-        for i in range(90):
-            date = base_date + timedelta(days=i)
-            if random.random() < 0.3:  # 30% chance of transaction per day
-                category, min_amt, max_amt = random.choice(expense_categories)
-                amount = random.uniform(min_amt, max_amt)
-                transactions.append(Transaction(
-                    date.strftime("%Y-%m-%d"),
-                    -amount,
-                    category,
-                    f"{category.title()} expense",
-                    "expense"
-                ))
-        
-        return transactions
-    
-    def get_epf_balance(self) -> float:
-        return 485000
-    
-    def get_credit_score(self) -> int:
-        return 758
+class FiMCPDataGenerator:
+    def __init__(self, mcp_url="https://mcp.fi.money:8080/mcp/stream"):
+        self.mcp_url = mcp_url
+        self.session = None
+        self.initialized = False
+        self.data = {}
 
-    def generate_loan_details(self) -> List[LoanDetail]:
-        return [
-            LoanDetail(
-                name="Home Loan - HDFC",
-                principal=4000000,
-                outstanding=3200000,
-                interest_rate=8.5,
-                emi=35000,
-                tenure_months=240,
-                start_date="2023-01-15",
-                loan_type="home",
-                property="Apartment - Koramangala"
-            ),
-            LoanDetail(
-                name="Car Loan - ICICI",
-                principal=600000,
-                outstanding=450000,
-                interest_rate=9.2,
-                emi=18000,
-                tenure_months=36,
-                start_date="2022-06-01",
-                loan_type="car"
-            ),
-            LoanDetail(
-                name="Personal Loan - Axis",
-                principal=200000,
-                outstanding=150000,
-                interest_rate=12.5,
-                emi=8000,
-                tenure_months=24,
-                start_date="2023-05-01",
-                loan_type="personal"
-            ),
-            LoanDetail(
-                name="Mortgage - SBI",
-                principal=2500000,
-                outstanding=2100000,
-                interest_rate=7.9,
-                emi=22000,
-                tenure_months=180,
-                start_date="2021-09-01",
-                loan_type="mortgage",
-                property="Plot - Whitefield"
-            ),
-        ]
+    async def authenticate(self):
+        print("Please enter your Fi MCP passcode (from the Fi app): ", end="")
+        passcode = input().strip()
+        async with streamablehttp_client(self.mcp_url) as (read_stream, write_stream, _):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                # Authenticate with passcode
+                await session.authenticate(passcode)
+                self.session = session
+                self.initialized = True
+                print("[MCP] Authentication successful.")
 
-    def generate_credit_card_details(self) -> List[CreditCardDetail]:
-        return [
-            CreditCardDetail(
-                name="SBI Platinum Card",
-                card_number="XXXX-XXXX-XXXX-1234",
-                limit=200000,
-                outstanding=25000,
-                due_date=(datetime.now() + timedelta(days=10)).strftime("%Y-%m-%d"),
-                min_due=2500,
-                last_payment=5000,
-                last_payment_date=(datetime.now() - timedelta(days=20)).strftime("%Y-%m-%d"),
-                annual_fee=1500,
-                rewards_points=3200
-            ),
-            CreditCardDetail(
-                name="HDFC Regalia",
-                card_number="XXXX-XXXX-XXXX-5678",
-                limit=300000,
-                outstanding=18000,
-                due_date=(datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d"),
-                min_due=1800,
-                last_payment=2000,
-                last_payment_date=(datetime.now() - timedelta(days=15)).strftime("%Y-%m-%d"),
-                annual_fee=2500,
-                rewards_points=5400
-            ),
-        ]
+    async def fetch_net_worth(self):
+        if not self.initialized:
+            await self.authenticate()
+        response = await self.session.call('networth:fetch_net_worth')
+        self.data['net_worth'] = response
+        return response
 
-    def generate_fixed_deposits(self) -> List[FixedDeposit]:
-        return [
-            FixedDeposit(
-                name="FD - HDFC",
-                principal=300000,
-                current_value=330000,
-                interest_rate=6.5,
-                start_date="2022-04-01",
-                maturity_date="2025-04-01",
-                bank="HDFC"
-            ),
-            FixedDeposit(
-                name="FD - SBI",
-                principal=200000,
-                current_value=215000,
-                interest_rate=6.2,
-                start_date="2021-10-01",
-                maturity_date="2024-10-01",
-                bank="SBI"
-            ),
-        ]
+    async def fetch_credit_report(self):
+        if not self.initialized:
+            await self.authenticate()
+        response = await self.session.call('networth:fetch_credit_report')
+        self.data['credit_report'] = response
+        return response
 
-    def generate_recurring_deposits(self) -> List[RecurringDeposit]:
-        return [
-            RecurringDeposit(
-                name="RD - ICICI",
-                monthly_deposit=5000,
-                current_value=65000,
-                interest_rate=6.0,
-                start_date="2022-01-01",
-                maturity_date="2025-01-01",
-                bank="ICICI"
-            ),
-            RecurringDeposit(
-                name="RD - Axis",
-                monthly_deposit=3000,
-                current_value=38000,
-                interest_rate=6.1,
-                start_date="2021-07-01",
-                maturity_date="2024-07-01",
-                bank="Axis"
-            ),
-        ]
+    async def fetch_epf_details(self):
+        if not self.initialized:
+            await self.authenticate()
+        response = await self.session.call('networth:fetch_epf_details')
+        self.data['epf'] = response
+        return response
+
+    async def fetch_mf_transactions(self):
+        if not self.initialized:
+            await self.authenticate()
+        response = await self.session.call('networth:fetch_mf_transactions')
+        self.data['mf_transactions'] = response
+        return response
+
+    # TODO: Add more fetch methods as needed for other tools (loans, credit cards, etc.)
+
+# Refactor FinancialAnalyzer to use FiMCPDataGenerator
+class FinancialAnalyzer:
+    def __init__(self, mcp_data_generator=None):
+        self.data_generator = mcp_data_generator or FiMCPDataGenerator()
+        self.assets = []
+        self.liabilities = []
+        self.sips = []
+        self.transactions = []
+        self.epf_balance = 0
+        self.credit_score = 0
+        # ... other fields as needed
+
+    async def initialize(self):
+        # Fetch and parse all required data from MCP
+        net_worth_data = await self.data_generator.fetch_net_worth()
+        credit_report_data = await self.data_generator.fetch_credit_report()
+        epf_data = await self.data_generator.fetch_epf_details()
+        mf_tx_data = await self.data_generator.fetch_mf_transactions()
+        # TODO: Parse and map these responses to self.assets, self.liabilities, self.sips, etc.
+        #       Use the README.md for field mapping. If any data is missing, add a TODO or ask the user.
+        # Example: self.assets = parse_assets_from_net_worth(net_worth_data)
+        # Example: self.sips = parse_sips_from_mf_analytics(net_worth_data)
+        pass
+
+# TODO: Update all tools and plotting logic to use the async FinancialAnalyzer and real MCP data.
+#       Add async/await where needed and update the main/chatbot logic to support async calls.
+#       For any missing data (e.g., credit card details, loans), prompt the user or add a TODO.
 
 # Financial Analysis Tools
 class FinancialAnalyzer:
     def __init__(self):
-        self.data_generator = MockFinancialDataGenerator()
+        # self.data_generator = MockFinancialDataGenerator()
         self.assets = self.data_generator.generate_assets()
         self.liabilities = self.data_generator.generate_liabilities()
         self.sips = self.data_generator.generate_sip_investments()
