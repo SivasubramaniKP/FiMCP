@@ -835,25 +835,36 @@ def plot_loan_outstanding_over_time() -> str:
 
 @tool
 def plot_sip_investment_growth() -> str:
-    """Plot SIP investment growth (mocked) for each fund and save the graph to the file system."""
+    """Plot SIP investment growth (mocked) for each fund and save the graph to the file system. Always saves a plot, even if no SIPs."""
     ensure_plots_dir()
     now = datetime.now()
     months = [(now - timedelta(days=30*i)).strftime('%Y-%m') for i in reversed(range(12))]
     sips = analyzer.sips
+    print(f"[DEBUG] Number of SIPs: {len(sips)}")
     plt.figure(figsize=(12,7))
-    for sip in sips:
-        # Mock: assume linear growth from 0 to current_value
-        values = [sip.current_value * (i/11) for i in range(12)]
-        plt.plot(months, values, marker='o', label=sip.name)
-    plt.title('SIP Investment Growth (Last 12 Months)')
-    plt.xlabel('Month')
-    plt.ylabel('Value (₹)')
-    plt.legend()
-    plt.tight_layout()
+    if not sips:
+        plt.text(0.5, 0.5, 'No SIP data available', fontsize=18, ha='center', va='center', transform=plt.gca().transAxes)
+        plt.title('SIP Investment Growth (Last 12 Months)')
+        plt.axis('off')
+    else:
+        for sip in sips:
+            # Mock: assume linear growth from 0 to current_value
+            values = [sip.current_value * (i/11) for i in range(12)]
+            plt.plot(months, values, marker='o', label=sip.name)
+        plt.title('SIP Investment Growth (Last 12 Months)')
+        plt.xlabel('Month')
+        plt.ylabel('Value (₹)')
+        plt.legend()
+        plt.tight_layout()
     filename = f"plots/sip_investment_growth_{now.strftime('%Y%m%d_%H%M%S')}.png"
-    plt.savefig(filename)
-    plt.close()
-    return f"SIP investment growth plot saved to: {filename}"
+    try:
+        plt.savefig(filename)
+        plt.close()
+        print(f"[DEBUG] SIP plot saved to: {filename}")
+        return f"SIP investment growth plot saved to: {filename}"
+    except Exception as e:
+        print(f"[ERROR] Failed to save SIP plot: {e}")
+        raise
 
 @tool
 def plot_deposit_growth() -> str:
