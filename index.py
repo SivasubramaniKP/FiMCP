@@ -20,6 +20,8 @@ from dataclasses import dataclass
 import requests
 from io import StringIO
 import math
+import matplotlib.pyplot as plt
+import os.path
 
 # Set up environment
 try:
@@ -728,6 +730,158 @@ def get_deposit_summary() -> str:
             summary += f"- {rd.name} ({rd.bank})\n  - Monthly Deposit: ₹{rd.monthly_deposit:,.2f}\n  - Current Value: ₹{rd.current_value:,.2f}\n  - Interest Rate: {rd.interest_rate:.2f}%\n  - Start Date: {rd.start_date}\n  - Maturity Date: {rd.maturity_date}\n"
     return summary
 
+@tool
+def plot_monthly_credit_card_expenses() -> str:
+    """Plot monthly credit card expenses (total and per card) and save the graph to the file system."""
+    ensure_plots_dir()
+    # Aggregate by card and by month
+    cards = analyzer.credit_card_details
+    transactions = analyzer.transactions
+    # Only consider last 6 months
+    now = datetime.now()
+    months = [(now - timedelta(days=30*i)).strftime('%Y-%m') for i in reversed(range(6))]
+    card_names = [card.name for card in cards]
+    # Initialize data
+    data = {card: {month: 0.0 for month in months} for card in card_names}
+    # Aggregate expenses by card and month
+    for card in cards:
+        for t in transactions:
+            if t.type == 'expense' and card.name.lower().split()[0] in t.description.lower():
+                t_month = t.date[:7]
+                if t_month in months:
+                    data[card.name][t_month] += abs(t.amount)
+    # Plot
+    plt.figure(figsize=(10,6))
+    for card in card_names:
+        plt.plot(months, [data[card][m] for m in months], marker='o', label=card)
+    plt.title('Monthly Credit Card Expenses (Last 6 Months)')
+    plt.xlabel('Month')
+    plt.ylabel('Amount (₹)')
+    plt.legend()
+    plt.tight_layout()
+    filename = f"plots/credit_card_expenses_{now.strftime('%Y%m%d_%H%M%S')}.png"
+    plt.savefig(filename)
+    plt.close()
+    return f"Credit card expenses plot saved to: {filename}"
+
+@tool
+def plot_net_worth_over_time() -> str:
+    """Plot net worth over the last 12 months (mocked) and save the graph to the file system."""
+    ensure_plots_dir()
+    now = datetime.now()
+    months = [(now - timedelta(days=30*i)).strftime('%Y-%m') for i in reversed(range(12))]
+    # Mock net worth history: add some random walk to current net worth
+    current = analyzer.calculate_net_worth()['net_worth']
+    net_worths = [current - (11-i)*random.uniform(20000, 80000) for i in range(12)]
+    plt.figure(figsize=(10,6))
+    plt.plot(months, net_worths, marker='o', color='tab:blue')
+    plt.title('Net Worth Over Time (Last 12 Months)')
+    plt.xlabel('Month')
+    plt.ylabel('Net Worth (₹)')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    filename = f"plots/net_worth_over_time_{now.strftime('%Y%m%d_%H%M%S')}.png"
+    plt.savefig(filename)
+    plt.close()
+    return f"Net worth over time plot saved to: {filename}"
+
+@tool
+def plot_monthly_spending_by_category() -> str:
+    """Plot monthly spending by category for the last 6 months and save the graph to the file system."""
+    ensure_plots_dir()
+    now = datetime.now()
+    months = [(now - timedelta(days=30*i)).strftime('%Y-%m') for i in reversed(range(6))]
+    transactions = analyzer.transactions
+    categories = set(t.category for t in transactions if t.type == 'expense')
+    data = {cat: [0.0 for _ in months] for cat in categories}
+    for idx, month in enumerate(months):
+        for t in transactions:
+            if t.type == 'expense' and t.date[:7] == month:
+                data[t.category][idx] += abs(t.amount)
+    plt.figure(figsize=(12,7))
+    for cat in categories:
+        plt.plot(months, data[cat], marker='o', label=cat)
+    plt.title('Monthly Spending by Category (Last 6 Months)')
+    plt.xlabel('Month')
+    plt.ylabel('Amount (₹)')
+    plt.legend()
+    plt.tight_layout()
+    filename = f"plots/monthly_spending_by_category_{now.strftime('%Y%m%d_%H%M%S')}.png"
+    plt.savefig(filename)
+    plt.close()
+    return f"Monthly spending by category plot saved to: {filename}"
+
+@tool
+def plot_loan_outstanding_over_time() -> str:
+    """Plot total loan outstanding over the last 12 months (mocked) and save the graph to the file system."""
+    ensure_plots_dir()
+    now = datetime.now()
+    months = [(now - timedelta(days=30*i)).strftime('%Y-%m') for i in reversed(range(12))]
+    # Mock: assume each month, some EMI is paid off
+    loans = analyzer.loan_details
+    total_outstanding = sum(loan.outstanding for loan in loans)
+    outstanding_history = [max(total_outstanding - (11-i)*sum(loan.emi for loan in loans), 0) for i in range(12)]
+    plt.figure(figsize=(10,6))
+    plt.plot(months, outstanding_history, marker='o', color='tab:red')
+    plt.title('Loan Outstanding Over Time (Last 12 Months)')
+    plt.xlabel('Month')
+    plt.ylabel('Outstanding Amount (₹)')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    filename = f"plots/loan_outstanding_over_time_{now.strftime('%Y%m%d_%H%M%S')}.png"
+    plt.savefig(filename)
+    plt.close()
+    return f"Loan outstanding over time plot saved to: {filename}"
+
+@tool
+def plot_sip_investment_growth() -> str:
+    """Plot SIP investment growth (mocked) for each fund and save the graph to the file system."""
+    ensure_plots_dir()
+    now = datetime.now()
+    months = [(now - timedelta(days=30*i)).strftime('%Y-%m') for i in reversed(range(12))]
+    sips = analyzer.sips
+    plt.figure(figsize=(12,7))
+    for sip in sips:
+        # Mock: assume linear growth from 0 to current_value
+        values = [sip.current_value * (i/11) for i in range(12)]
+        plt.plot(months, values, marker='o', label=sip.name)
+    plt.title('SIP Investment Growth (Last 12 Months)')
+    plt.xlabel('Month')
+    plt.ylabel('Value (₹)')
+    plt.legend()
+    plt.tight_layout()
+    filename = f"plots/sip_investment_growth_{now.strftime('%Y%m%d_%H%M%S')}.png"
+    plt.savefig(filename)
+    plt.close()
+    return f"SIP investment growth plot saved to: {filename}"
+
+@tool
+def plot_deposit_growth() -> str:
+    """Plot Fixed and Recurring Deposit growth (mocked) over the last 12 months and save the graph to the file system."""
+    ensure_plots_dir()
+    now = datetime.now()
+    months = [(now - timedelta(days=30*i)).strftime('%Y-%m') for i in reversed(range(12))]
+    fds = analyzer.fixed_deposits
+    rds = analyzer.recurring_deposits
+    plt.figure(figsize=(12,7))
+    for fd in fds:
+        # Mock: linear growth from principal to current_value
+        values = [fd.principal + (fd.current_value - fd.principal) * (i/11) for i in range(12)]
+        plt.plot(months, values, marker='o', label=f"FD: {fd.name}")
+    for rd in rds:
+        # Mock: linear growth from 0 to current_value
+        values = [rd.current_value * (i/11) for i in range(12)]
+        plt.plot(months, values, marker='o', label=f"RD: {rd.name}")
+    plt.title('Deposit Growth (FD & RD, Last 12 Months)')
+    plt.xlabel('Month')
+    plt.ylabel('Value (₹)')
+    plt.legend()
+    plt.tight_layout()
+    filename = f"plots/deposit_growth_{now.strftime('%Y%m%d_%H%M%S')}.png"
+    plt.savefig(filename)
+    plt.close()
+    return f"Deposit growth plot saved to: {filename}"
+
 # Initialize Gemini model
 def initialize_gemini_model():
     """Initialize Gemini model with proper configuration."""
@@ -765,7 +919,13 @@ def create_financial_agent():
         generate_financial_report,
         get_credit_card_summary,
         get_loan_mortgage_summary,
-        get_deposit_summary
+        get_deposit_summary,
+        plot_monthly_credit_card_expenses,
+        plot_net_worth_over_time,
+        plot_monthly_spending_by_category,
+        plot_loan_outstanding_over_time,
+        plot_sip_investment_growth,
+        plot_deposit_growth
     ]
     
     # Create system prompt template
@@ -787,7 +947,7 @@ def create_financial_agent():
     - Profession: {analyzer.data_generator.user_profile['profession']}
     - Location: {analyzer.data_generator.user_profile['city']}
     
-    Always provide personalized, actionable advice based on the user's actual financial data.
+    Always provide personalized, talk in Indian financing Terms, actionable advice based on the user's actual financial data.
     Be conversational, empathetic, and encouraging while maintaining professional accuracy.
     Use Indian currency (₹) and financial context throughout your responses.
     
@@ -855,6 +1015,11 @@ class FinancialChatbot:
         except Exception as e:
             error_msg = f"I encountered an error: {str(e)}. Please try rephrasing your question."
             return error_msg
+
+# Utility to ensure plots directory exists
+def ensure_plots_dir():
+    if not os.path.exists('plots'):
+        os.makedirs('plots')
 
 # Main chatbot interface
 def main():
