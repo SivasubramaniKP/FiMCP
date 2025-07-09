@@ -481,7 +481,7 @@ def generate_financial_report() -> str:
 def initialize_gemini_model():
     """Initialize Gemini model with proper configuration."""
     # Make sure to set your Google API key
-    # os.environ["GOOGLE_API_KEY"] = "your-api-key-here"
+    os.environ["GOOGLE_API_KEY"] = "AIzaSyCthTT_cy1WMTBe_PBiYtxDjDgA8glRPt4"
     
     try:
         model = ChatGoogleGenerativeAI(
