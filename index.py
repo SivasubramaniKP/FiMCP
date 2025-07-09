@@ -73,6 +73,51 @@ class Transaction:
     description: str
     type: str  # 'income' or 'expense'
 
+@dataclass
+class LoanDetail:
+    name: str
+    principal: float
+    outstanding: float
+    interest_rate: float
+    emi: float
+    tenure_months: int
+    start_date: str
+    loan_type: str  # e.g., 'home', 'car', 'personal', 'mortgage'
+    property: Optional[str] = None  # For mortgage loans
+
+@dataclass
+class CreditCardDetail:
+    name: str
+    card_number: str
+    limit: float
+    outstanding: float
+    due_date: str
+    min_due: float
+    last_payment: float
+    last_payment_date: str
+    annual_fee: float
+    rewards_points: int
+
+@dataclass
+class FixedDeposit:
+    name: str
+    principal: float
+    current_value: float
+    interest_rate: float
+    start_date: str
+    maturity_date: str
+    bank: str
+
+@dataclass
+class RecurringDeposit:
+    name: str
+    monthly_deposit: float
+    current_value: float
+    interest_rate: float
+    start_date: str
+    maturity_date: str
+    bank: str
+
 # Mock Financial Data Generator
 class MockFinancialDataGenerator:
     def __init__(self):
@@ -160,6 +205,124 @@ class MockFinancialDataGenerator:
     def get_credit_score(self) -> int:
         return 758
 
+    def generate_loan_details(self) -> List[LoanDetail]:
+        return [
+            LoanDetail(
+                name="Home Loan - HDFC",
+                principal=4000000,
+                outstanding=3200000,
+                interest_rate=8.5,
+                emi=35000,
+                tenure_months=240,
+                start_date="2023-01-15",
+                loan_type="home",
+                property="Apartment - Koramangala"
+            ),
+            LoanDetail(
+                name="Car Loan - ICICI",
+                principal=600000,
+                outstanding=450000,
+                interest_rate=9.2,
+                emi=18000,
+                tenure_months=36,
+                start_date="2022-06-01",
+                loan_type="car"
+            ),
+            LoanDetail(
+                name="Personal Loan - Axis",
+                principal=200000,
+                outstanding=150000,
+                interest_rate=12.5,
+                emi=8000,
+                tenure_months=24,
+                start_date="2023-05-01",
+                loan_type="personal"
+            ),
+            LoanDetail(
+                name="Mortgage - SBI",
+                principal=2500000,
+                outstanding=2100000,
+                interest_rate=7.9,
+                emi=22000,
+                tenure_months=180,
+                start_date="2021-09-01",
+                loan_type="mortgage",
+                property="Plot - Whitefield"
+            ),
+        ]
+
+    def generate_credit_card_details(self) -> List[CreditCardDetail]:
+        return [
+            CreditCardDetail(
+                name="SBI Platinum Card",
+                card_number="XXXX-XXXX-XXXX-1234",
+                limit=200000,
+                outstanding=25000,
+                due_date=(datetime.now() + timedelta(days=10)).strftime("%Y-%m-%d"),
+                min_due=2500,
+                last_payment=5000,
+                last_payment_date=(datetime.now() - timedelta(days=20)).strftime("%Y-%m-%d"),
+                annual_fee=1500,
+                rewards_points=3200
+            ),
+            CreditCardDetail(
+                name="HDFC Regalia",
+                card_number="XXXX-XXXX-XXXX-5678",
+                limit=300000,
+                outstanding=18000,
+                due_date=(datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d"),
+                min_due=1800,
+                last_payment=2000,
+                last_payment_date=(datetime.now() - timedelta(days=15)).strftime("%Y-%m-%d"),
+                annual_fee=2500,
+                rewards_points=5400
+            ),
+        ]
+
+    def generate_fixed_deposits(self) -> List[FixedDeposit]:
+        return [
+            FixedDeposit(
+                name="FD - HDFC",
+                principal=300000,
+                current_value=330000,
+                interest_rate=6.5,
+                start_date="2022-04-01",
+                maturity_date="2025-04-01",
+                bank="HDFC"
+            ),
+            FixedDeposit(
+                name="FD - SBI",
+                principal=200000,
+                current_value=215000,
+                interest_rate=6.2,
+                start_date="2021-10-01",
+                maturity_date="2024-10-01",
+                bank="SBI"
+            ),
+        ]
+
+    def generate_recurring_deposits(self) -> List[RecurringDeposit]:
+        return [
+            RecurringDeposit(
+                name="RD - ICICI",
+                monthly_deposit=5000,
+                current_value=65000,
+                interest_rate=6.0,
+                start_date="2022-01-01",
+                maturity_date="2025-01-01",
+                bank="ICICI"
+            ),
+            RecurringDeposit(
+                name="RD - Axis",
+                monthly_deposit=3000,
+                current_value=38000,
+                interest_rate=6.1,
+                start_date="2021-07-01",
+                maturity_date="2024-07-01",
+                bank="Axis"
+            ),
+        ]
+
 # Financial Analysis Tools
 class FinancialAnalyzer:
     def __init__(self):
@@ -170,49 +333,76 @@ class FinancialAnalyzer:
         self.transactions = self.data_generator.generate_transactions()
         self.epf_balance = self.data_generator.get_epf_balance()
         self.credit_score = self.data_generator.get_credit_score()
+        # New data
+        self.loan_details = self.data_generator.generate_loan_details()
+        self.credit_card_details = self.data_generator.generate_credit_card_details()
+        self.fixed_deposits = self.data_generator.generate_fixed_deposits()
+        self.recurring_deposits = self.data_generator.generate_recurring_deposits()
         
     def calculate_net_worth(self) -> Dict[str, Any]:
-        total_assets = sum(asset.current_value for asset in self.assets) + self.epf_balance
-        total_liabilities = sum(liability.current_amount for liability in self.liabilities)
+        # Assets
+        total_assets = (
+            sum(asset.current_value for asset in self.assets)
+            + self.epf_balance
+            + sum(fd.current_value for fd in self.fixed_deposits)
+            + sum(rd.current_value for rd in self.recurring_deposits)
+        )
+        # Liabilities
+        total_liabilities = (
+            sum(liability.current_amount for liability in self.liabilities)
+            + sum(loan.outstanding for loan in self.loan_details)
+            + sum(card.outstanding for card in self.credit_card_details)
+        )
         net_worth = total_assets - total_liabilities
-        
         return {
             "total_assets": total_assets,
             "total_liabilities": total_liabilities,
             "net_worth": net_worth,
             "epf_balance": self.epf_balance,
-            "asset_breakdown": {asset.name: asset.current_value for asset in self.assets},
-            "liability_breakdown": {liability.name: liability.current_amount for liability in self.liabilities}
+            "asset_breakdown": {**{asset.name: asset.current_value for asset in self.assets},
+                                 **{fd.name: fd.current_value for fd in self.fixed_deposits},
+                                 **{rd.name: rd.current_value for rd in self.recurring_deposits}},
+            "liability_breakdown": {**{liability.name: liability.current_amount for liability in self.liabilities},
+                                     **{loan.name: loan.outstanding for loan in self.loan_details},
+                                     **{card.name: card.outstanding for card in self.credit_card_details}},
+            "fixed_deposits": [{"name": fd.name, "current_value": fd.current_value} for fd in self.fixed_deposits],
+            "recurring_deposits": [{"name": rd.name, "current_value": rd.current_value} for rd in self.recurring_deposits],
+            "loans": [{"name": loan.name, "outstanding": loan.outstanding} for loan in self.loan_details],
+            "credit_cards": [{"name": card.name, "outstanding": card.outstanding} for card in self.credit_card_details],
         }
     
     def calculate_financial_health_score(self) -> Dict[str, Any]:
         net_worth_data = self.calculate_net_worth()
         monthly_income = self.data_generator.user_profile["monthly_income"]
-        
         # Calculate various metrics
-        monthly_liabilities = sum(liability.emi for liability in self.liabilities)
+        monthly_liabilities = (
+            sum(liability.emi for liability in self.liabilities)
+            + sum(loan.emi for loan in self.loan_details)
+            + sum(card.min_due for card in self.credit_card_details)
+        )
         debt_to_income = monthly_liabilities / monthly_income
-        
         # Calculate savings rate
-        monthly_expenses = sum(t.amount for t in self.transactions if t.type == "expense" and 
-                             datetime.strptime(t.date, "%Y-%m-%d") >= datetime.now() - timedelta(days=30)) / -1
+        monthly_expenses = (
+            sum(t.amount for t in self.transactions if t.type == "expense" and 
+                datetime.strptime(t.date, "%Y-%m-%d") >= datetime.now() - timedelta(days=30)) / -1
+            + sum(card.last_payment for card in self.credit_card_details)
+        )
         savings_rate = (monthly_income - monthly_expenses) / monthly_income
-        
         # Scoring components (out of 100)
         credit_score_component = min(self.credit_score / 850 * 25, 25)
         debt_component = max(0, 25 - (debt_to_income * 100))
         savings_component = min(savings_rate * 100 * 0.25, 25)
         net_worth_component = min(net_worth_data["net_worth"] / 5000000 * 25, 25)
-        
         total_score = credit_score_component + debt_component + savings_component + net_worth_component
-        
         return {
             "total_score": round(total_score, 1),
             "credit_score_component": round(credit_score_component, 1),
             "debt_component": round(debt_component, 1),
             "savings_component": round(savings_component, 1),
             "net_worth_component": round(net_worth_component, 1),
-            "recommendations": self._get_health_recommendations(total_score)
+            "recommendations": self._get_health_recommendations(total_score),
+            "monthly_liabilities": monthly_liabilities,
+            "monthly_expenses": monthly_expenses,
         }
     
     def _get_health_recommendations(self, score: float) -> List[str]:
@@ -415,7 +605,6 @@ def get_monthly_spending_analysis() -> str:
     """Analyze monthly spending patterns and trends."""
     recent_transactions = [t for t in analyzer.transactions if 
                          datetime.strptime(t.date, "%Y-%m-%d") >= datetime.now() - timedelta(days=30)]
-    
     expense_by_category = {}
     for transaction in recent_transactions:
         if transaction.type == "expense":
@@ -423,9 +612,15 @@ def get_monthly_spending_analysis() -> str:
             if category not in expense_by_category:
                 expense_by_category[category] = 0
             expense_by_category[category] += abs(transaction.amount)
-    
+    # Add credit card payments as a category
+    total_credit_card_payments = sum(card.last_payment for card in analyzer.credit_card_details)
+    if total_credit_card_payments > 0:
+        expense_by_category["credit_card_payments"] = total_credit_card_payments
+    # Add loan EMIs as a category
+    total_loan_emis = sum(loan.emi for loan in analyzer.loan_details)
+    if total_loan_emis > 0:
+        expense_by_category["loan_emis"] = total_loan_emis
     total_expenses = sum(expense_by_category.values())
-    
     analysis = f"""
     **Monthly Spending Analysis:**
     - Total Monthly Expenses: ₹{total_expenses:,.2f}
@@ -434,11 +629,9 @@ def get_monthly_spending_analysis() -> str:
     
     **Expense Breakdown:**
     """
-    
     for category, amount in sorted(expense_by_category.items(), key=lambda x: x[1], reverse=True):
         percentage = (amount / total_expenses) * 100
-        analysis += f"- {category.title()}: ₹{amount:,.2f} ({percentage:.1f}%)\n"
-    
+        analysis += f"- {category.replace('_', ' ').title()}: ₹{amount:,.2f} ({percentage:.1f}%)\n"
     return analysis
 
 @tool
@@ -447,7 +640,11 @@ def generate_financial_report() -> str:
     net_worth = analyzer.calculate_net_worth()
     health_score = analyzer.calculate_financial_health_score()
     sip_performance = analyzer.analyze_sip_performance()
-    
+    # New breakdowns
+    loans = net_worth["loans"]
+    credit_cards = net_worth["credit_cards"]
+    fixed_deposits = net_worth["fixed_deposits"]
+    recurring_deposits = net_worth["recurring_deposits"]
     report = f"""
     **COMPREHENSIVE FINANCIAL REPORT**
     Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
@@ -463,6 +660,18 @@ def generate_financial_report() -> str:
     Total Liabilities: ₹{net_worth['total_liabilities']:,.2f}
     Net Worth: ₹{net_worth['net_worth']:,.2f}
     
+    **LOANS & MORTGAGES:**
+    {chr(10).join([f"- {loan['name']}: Outstanding ₹{loan['outstanding']:,.2f}" for loan in loans])}
+    
+    **CREDIT CARDS:**
+    {chr(10).join([f"- {card['name']}: Outstanding ₹{card['outstanding']:,.2f}" for card in credit_cards])}
+    
+    **FIXED DEPOSITS:**
+    {chr(10).join([f"- {fd['name']}: ₹{fd['current_value']:,.2f}" for fd in fixed_deposits])}
+    
+    **RECURRING DEPOSITS:**
+    {chr(10).join([f"- {rd['name']}: ₹{rd['current_value']:,.2f}" for rd in recurring_deposits])}
+    
     **FINANCIAL HEALTH SCORE:** {health_score['total_score']}/100
     
     **INVESTMENT PORTFOLIO:**
@@ -474,8 +683,50 @@ def generate_financial_report() -> str:
     
     This report can be exported to PDF or CSV for tax filing or CA consultation.
     """
-    
     return report
+
+@tool
+def get_credit_card_summary() -> str:
+    """Get a detailed summary of all credit cards, including limits, outstanding, due dates, and rewards."""
+    cards = analyzer.credit_card_details
+    if not cards:
+        return "No credit card data available."
+    summary = "**Credit Card Summary:**\n"
+    for card in cards:
+        summary += f"\n- {card.name} ({card.card_number})\n  - Limit: ₹{card.limit:,.2f}\n  - Outstanding: ₹{card.outstanding:,.2f}\n  - Due Date: {card.due_date}\n  - Minimum Due: ₹{card.min_due:,.2f}\n  - Last Payment: ₹{card.last_payment:,.2f} on {card.last_payment_date}\n  - Annual Fee: ₹{card.annual_fee:,.2f}\n  - Rewards Points: {card.rewards_points}\n"
+    return summary
+
+@tool
+def get_loan_mortgage_summary() -> str:
+    """Get a detailed summary of all loans and mortgages, including property, outstanding, EMI, and tenure."""
+    loans = analyzer.loan_details
+    if not loans:
+        return "No loan or mortgage data available."
+    summary = "**Loan & Mortgage Summary:**\n"
+    for loan in loans:
+        summary += f"\n- {loan.name} ({loan.loan_type.title()})\n  - Principal: ₹{loan.principal:,.2f}\n  - Outstanding: ₹{loan.outstanding:,.2f}\n  - Interest Rate: {loan.interest_rate:.2f}%\n  - EMI: ₹{loan.emi:,.2f}\n  - Tenure: {loan.tenure_months} months\n  - Start Date: {loan.start_date}\n"
+        if loan.property:
+            summary += f"  - Property: {loan.property}\n"
+    return summary
+
+@tool
+def get_deposit_summary() -> str:
+    """Get a detailed summary of all fixed and recurring deposits."""
+    fds = analyzer.fixed_deposits
+    rds = analyzer.recurring_deposits
+    summary = "**Deposit Summary:**\n\n**Fixed Deposits:**\n"
+    if not fds:
+        summary += "- None\n"
+    else:
+        for fd in fds:
+            summary += f"- {fd.name} ({fd.bank})\n  - Principal: ₹{fd.principal:,.2f}\n  - Current Value: ₹{fd.current_value:,.2f}\n  - Interest Rate: {fd.interest_rate:.2f}%\n  - Start Date: {fd.start_date}\n  - Maturity Date: {fd.maturity_date}\n"
+    summary += "\n**Recurring Deposits:**\n"
+    if not rds:
+        summary += "- None\n"
+    else:
+        for rd in rds:
+            summary += f"- {rd.name} ({rd.bank})\n  - Monthly Deposit: ₹{rd.monthly_deposit:,.2f}\n  - Current Value: ₹{rd.current_value:,.2f}\n  - Interest Rate: {rd.interest_rate:.2f}%\n  - Start Date: {rd.start_date}\n  - Maturity Date: {rd.maturity_date}\n"
+    return summary
 
 # Initialize Gemini model
 def initialize_gemini_model():
@@ -511,7 +762,10 @@ def create_financial_agent():
         calculate_financial_health_score,
         simulate_retirement_planning,
         get_monthly_spending_analysis,
-        generate_financial_report
+        generate_financial_report,
+        get_credit_card_summary,
+        get_loan_mortgage_summary,
+        get_deposit_summary
     ]
     
     # Create system prompt template
